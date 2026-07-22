@@ -5,7 +5,44 @@
  * Development: Falls back to an in-memory sliding window automatically
  */
 
-// Lua script removed in favor of Redis pipeline transactions for atomic counter increments.
+/**
+ * Token Bucket Rate Limiting Lua Script for Upstash Redis.
+ *
+ * Uses a hash to store (tokens, lastRefill) and atomically refills tokens
+ * based on elapsed time. Handles concurrent burst traffic correctly because
+ * the Lua script executes atomically — no duplicate-member issue that the
+ * previous sliding-window ZADD approach had.
+ */
+export const TOKEN_BUCKET_LUA = `
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local limit = tonumber(ARGV[2])
+local window_seconds = tonumber(ARGV[3])
+
+local state = redis.call('HMGET', key, 'tokens', 'lastRefill')
+local tokens = tonumber(state[1])
+local lastRefill = tonumber(state[2])
+
+if tokens == nil then
+    redis.call('HMSET', key, 'tokens', limit - 1, 'lastRefill', now)
+    redis.call('EXPIRE', key, window_seconds)
+    return 1
+end
+
+local elapsed_ms = math.max(0, now - lastRefill)
+local refill = math.floor(elapsed_ms / (window_seconds * 1000) * limit)
+tokens = math.min(limit, tokens + refill)
+
+if tokens >= 1 then
+    tokens = tokens - 1
+    redis.call('HMSET', key, 'tokens', tokens, 'lastRefill', now)
+    redis.call('EXPIRE', key, window_seconds)
+    return 1
+else
+    redis.call('EXPIRE', key, window_seconds)
+    return 0
+end
+`;
 
 let redisClient: any = null;
 
@@ -39,6 +76,15 @@ async function upstashRateLimit(
   if (!redis) return memRateLimit(identifier, limit);
 
   try {
+    const now = Date.now();
+    const windowSeconds = 60;
+    const key = `worksphere:ratelimit:${identifier}`;
+
+    const allowed = await redis.eval(
+      TOKEN_BUCKET_LUA,
+      [key],
+      [now, limit, windowSeconds],
+    );
     const windowMs = 60_000;
     const windowSeconds = Math.ceil(windowMs / 1000);
     const windowMinute = Math.floor(Date.now() / windowMs);
