@@ -218,9 +218,9 @@ export function useMeshCanvasWhiteboard(
       unsubDocUpdateRef.current?.();
       um.destroy();
       if (newProvider) {
-        if (handleStatus) newProvider.off("status", handleStatus);
-        if (handleSync) newProvider.off("sync", handleSync);
-        newProvider.disconnect();
+        if (handleStatus && typeof newProvider.off === "function") newProvider.off("status", handleStatus);
+        if (handleSync && typeof newProvider.off === "function") newProvider.off("sync", handleSync);
+        if (typeof newProvider.disconnect === "function") newProvider.disconnect();
       }
       doc.destroy();
       shapesRef.current = null;
