@@ -5,7 +5,7 @@ import * as Y from "yjs";
 import usePartySocket from "partysocket/react";
 import { CryptoManager } from "@/lib/e2ee/CryptoManager";
 import { KeyStore } from "@/lib/e2ee/KeyStore";
-import { Unlock, Key, Loader2, Share2 } from "lucide-react";
+import { Lock, Unlock, Key, Loader2, Share2 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
 import {
   generateKeyPair,
@@ -26,7 +26,7 @@ export default function Scratchpad({ sessionId }: Props) {
   const [isNegotiating, setIsNegotiating] = useState(false);
   const [text, setText] = useState("");
   const { toast } = useToast();
-
+  
   const clientId = useRef(crypto.randomUUID());
   const ecdhKeyPair = useRef<KeyPair | null>(null);
 
@@ -263,14 +263,16 @@ export default function Scratchpad({ sessionId }: Props) {
     };
   }, [socket, hasKey]);
   const handleShare = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      toast("Scratchpad link copied to clipboard!", "success");
-    } catch (error) {
-      console.error("Failed to copy scratchpad link", error);
-      toast("Failed to copy scratchpad link.", "error");
-    }
-  };
+  try {
+    await navigator.clipboard.writeText(window.location.href);
+    toast("Scratchpad link copied to clipboard!", "success");
+  } catch (error) {
+    console.error("Failed to copy scratchpad link", error);
+    toast("Failed to copy scratchpad link.", "error");
+  }
+};
+
+
 
   const handleClearKey = async () => {
     await keyStore.deleteSessionKey(sessionId);
@@ -346,22 +348,23 @@ export default function Scratchpad({ sessionId }: Props) {
           <span className="text-sm font-medium">E2EE Scratchpad</span>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={handleShare}
-            className="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1"
-          >
-            <Share2 className="h-3 w-3" />
-            Share
-          </button>
+  <button
+    onClick={handleShare}
+    className="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1"
+  >
+    <Share2 className="h-3 w-3" />
+    Share
+  </button>
 
-          <button
-            onClick={handleClearKey}
-            className="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1"
-          >
-            <Key className="h-3 w-3" />
-            Clear Key
-          </button>
-        </div>
+  <button
+    onClick={handleClearKey}
+    className="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1"
+  >
+    <Key className="h-3 w-3" />
+    Clear Key
+  </button>
+</div>
+        
       </div>
       <div className="flex-1 p-4">
         <textarea
