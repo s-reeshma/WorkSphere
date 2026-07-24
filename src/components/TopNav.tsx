@@ -7,7 +7,11 @@ import { ReactiveUserButton } from "@/components/ReactiveUserButton";
 import { Coffee, LayoutGrid, Menu, Shield, X } from "lucide-react";
 import Image from "next/image";
 import { ThemeToggle } from "@/components/ThemeToggle";
+ feat/1628-offline-favorites-sync
+import { OfflineSyncBadge } from "@/components/Header/OfflineSyncBadge";
+
 import { NotificationBell } from "@/components/NotificationBell";
+ main
 
 interface TopNavProps {
   hideAuth?: boolean;
@@ -38,6 +42,9 @@ export function TopNav({ hideAuth = false }: TopNavProps) {
         </Link>
 
         <div className="flex items-center gap-2 ml-auto">
+          <div className="flex items-center justify-center shrink-0">
+            <OfflineSyncBadge />
+          </div>
           <div className="flex items-center justify-center shrink-0">
             <ThemeToggle />
           </div>

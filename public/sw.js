@@ -400,6 +400,45 @@ async function syncFavorites() {
   if (isSyncingFavorites) return;
   isSyncingFavorites = true;
   try {
+ feat/1628-offline-favorites-sync
+    const db = await openIndexedDB();
+
+    const pendingFavorites = await new Promise((resolve, reject) => {
+      const tx = db.transaction("pendingFavorites", "readonly");
+      const store = tx.objectStore("pendingFavorites");
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+
+    if (pendingFavorites.length === 0) return;
+
+    // Sort by timestamp
+    pendingFavorites.sort((a, b) => a.timestamp - b.timestamp);
+
+    const operations = pendingFavorites.map((fav) => ({
+      venueId: fav.venueId,
+      action: fav.action,
+      timestamp: fav.timestamp,
+    }));
+
+    const response = await fetch("/api/favorites/tags/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ operations }),
+    });
+
+    if (response.ok) {
+      // Clear all synced favorites
+      await new Promise((resolve, reject) => {
+        const tx = db.transaction("pendingFavorites", "readwrite");
+        const store = tx.objectStore("pendingFavorites");
+        pendingFavorites.forEach((fav) => store.delete(fav.id));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
     await withIdbLock(async () => {
       const db = await openIndexedDB();
       const pendingFavorites = await getPendingActions(db, [
@@ -446,7 +485,7 @@ async function syncFavorites() {
           console.error("Failed to sync favorite:", error);
         }
       }
-    });
+    }); main
   } catch (error) {
     if (isNetworkError(error)) {
       console.warn(
@@ -813,10 +852,13 @@ function openIndexedDB() {
   return new Promise((resolve, reject) => {
     try {
       const request = indexedDB.open("worksphere-offline", 6);
+ feat/1628-offline-favorites-sync
+
 
       request.onblocked = () => {
         console.warn("[SW] IndexedDB upgrade blocked");
       };
+ main
 
       request.onerror = () => reject(request.error);
 
@@ -889,12 +931,20 @@ function openIndexedDB() {
           receiptStore.createIndex("createdAt", "createdAt", { unique: false });
         }
 
+ feat/1628-offline-favorites-sync
+        // Pending favorites store
+        if (!db.objectStoreNames.contains("pendingFavorites")) {
+          db.createObjectStore("pendingFavorites", {
+            keyPath: "id",
+          });
+
         // Availability deltas store for periodic background sync (Issue #1126)
         if (!db.objectStoreNames.contains("availabilityDeltas")) {
           const deltaStore = db.createObjectStore("availabilityDeltas", {
             keyPath: "venueId",
           });
           deltaStore.createIndex("timestamp", "timestamp", { unique: false });
+ main
         }
       };
     } catch (err) {

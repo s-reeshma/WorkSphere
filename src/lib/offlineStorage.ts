@@ -20,7 +20,11 @@ userDoc.on("update", async (update: Uint8Array) => {
 });
 
 const DB_NAME = "worksphere-offline";
+ feat/1628-offline-favorites-sync
+const DB_VERSION = 6;
+
 const DB_VERSION = 5;
+ main
 
 const IDB_STORAGE_LOCK = "worksphere-offline-storage-lock";
 
@@ -251,9 +255,15 @@ export async function initOfflineDB(): Promise<IDBDatabase> {
           receiptStore.createIndex("createdAt", "createdAt", { unique: false });
         }
 
+ feat/1628-offline-favorites-sync
+        // Pending favorites store
+        if (!database.objectStoreNames.contains("pendingFavorites")) {
+          database.createObjectStore("pendingFavorites", {
+
         // Preference reranking cache store
         if (!database.objectStoreNames.contains("preference_rankings")) {
           database.createObjectStore("preference_rankings", {
+ main
             keyPath: "id",
           });
         }
@@ -1054,5 +1064,85 @@ export async function clearPreferenceRanking(): Promise<void> {
       req.onsuccess = () => resolve();
       req.onerror = () => reject(req.error);
     });
+  });
+}
+
+export interface PendingFavorite {
+  id: string;
+  venueId: string;
+  action: "add" | "remove";
+  timestamp: number;
+}
+
+export async function queuePendingFavorite(
+  venueId: string,
+  action: "add" | "remove",
+): Promise<void> {
+  const database = await initOfflineDB();
+
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(["pendingFavorites"], "readwrite");
+    const store = transaction.objectStore("pendingFavorites");
+    const request = store.getAll();
+
+    request.onsuccess = () => {
+      const existing = (request.result as PendingFavorite[]).filter(
+        (a) => a.venueId === venueId,
+      );
+
+      // If opposite action exists, delete it. Only latest action matters.
+      existing.forEach((a) => store.delete(a.id));
+
+      store.add({
+        id: crypto.randomUUID(),
+        venueId,
+        action,
+        timestamp: Date.now(),
+      });
+    };
+    request.onerror = () => reject(request.error);
+
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+
+  if ("serviceWorker" in navigator && "SyncManager" in window) {
+    try {
+      const swRegistration = await navigator.serviceWorker.ready;
+      await (swRegistration as any).sync.register("sync-favorites");
+    } catch (err) {
+      console.error("Background Sync registration failed:", err);
+    }
+  }
+}
+
+export async function getPendingFavorites(): Promise<PendingFavorite[]> {
+  const database = await initOfflineDB();
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(["pendingFavorites"], "readonly");
+    const store = transaction.objectStore("pendingFavorites");
+    const request = store.getAll();
+
+    request.onsuccess = () => {
+      const actions = (request.result as PendingFavorite[]).sort(
+        (a, b) => a.timestamp - b.timestamp,
+      );
+      resolve(actions);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+export async function removePendingFavorite(id: string): Promise<void> {
+  const database = await initOfflineDB();
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(["pendingFavorites"], "readwrite");
+    const store = transaction.objectStore("pendingFavorites");
+    const request = store.delete(id);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
   });
 }
