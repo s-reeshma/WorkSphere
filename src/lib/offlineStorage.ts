@@ -4,6 +4,7 @@
  * Integrated with Yjs for CRDT-based offline state mutation and background sync.
  */
 import * as Y from "yjs";
+import { withWebLock } from "./webLock";
 
 // Initialize global Y.Doc for user state
 export const userDoc = new Y.Doc();
@@ -25,99 +26,6 @@ const DB_VERSION = 6;
 
 const DB_VERSION = 5;
  main
-
-const IDB_STORAGE_LOCK = "worksphere-offline-storage-lock";
-
-/**
- * Execute an operation with exponential backoff retry if a DatabaseLockedError or lock contention error occurs.
- */
-export async function executeWithRetry<T>(
-  operation: () => Promise<T>,
-  maxRetries = 3,
-  delayMs = 50,
-): Promise<T> {
-  let attempt = 0;
-  while (true) {
-    try {
-      return await operation();
-    } catch (err: any) {
-      attempt++;
-      const isLockedError =
-        err?.name === "DatabaseLockedError" ||
-        err?.name === "AbortError" ||
-        err?.name === "UnknownError" ||
-        (err?.message && String(err.message).toLowerCase().includes("lock"));
-
-      if (isLockedError && attempt <= maxRetries) {
-        await new Promise((res) =>
-          setTimeout(res, delayMs * Math.pow(2, attempt - 1)),
-        );
-        continue;
-      }
-      throw err;
-    }
-  }
-}
-
-/**
- * Web Locks API wrapper to serialize IndexedDB transactions across concurrent tabs (#910, #1279)
- */
-export async function withWebLock<T>(
-  callback: () => Promise<T>,
-  lockName = IDB_STORAGE_LOCK,
-): Promise<T> {
-  const runner = async () => {
-    if (
-      typeof navigator !== "undefined" &&
-      "locks" in navigator &&
-      navigator.locks?.request
-    ) {
-      try {
-        return await navigator.locks.request(lockName, async () => {
-          return callback();
-        });
-      } catch {
-        return callback();
-      }
-    }
-    return callback();
-  };
-
-  return executeWithRetry(runner);
-}
-
-/**
- * Leader-election Web Lock: only ONE tab across all open windows runs the callback.
- * Other tabs skip (non-blocking) because the IndexedDB data is shared — the leader's
- * writes are visible to all tabs on the same origin (#1072).
- *
- * Returns `true` if this tab won the election and the callback ran; `false` if
- * another tab already holds the lock and work was skipped.
- */
-export async function withLeaderLock<T>(
-  lockName: string,
-  callback: () => Promise<T>,
-): Promise<{ acquired: boolean; result?: T }> {
-  if (
-    typeof navigator !== "undefined" &&
-    "locks" in navigator &&
-    navigator.locks?.request
-  ) {
-    try {
-      return await navigator.locks.request(
-        lockName,
-        { ifAvailable: true },
-        async (lock) => {
-          if (!lock) return { acquired: false };
-          return { acquired: true, result: await callback() };
-        },
-      );
-    } catch {
-      return { acquired: false, result: await callback() };
-    }
-  }
-  return { acquired: true, result: await callback() };
-}
 
 export interface OfflineVenue {
   id: string;
