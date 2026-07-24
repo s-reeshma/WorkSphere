@@ -3,6 +3,28 @@
  * Used for WebAuthn Passkey Master Secret Recovery
  */
 
+const getCrypto = () => {
+  if (
+    typeof globalThis !== "undefined" &&
+    globalThis.crypto &&
+    globalThis.crypto.getRandomValues
+  ) {
+    return globalThis.crypto;
+  }
+  if (typeof require !== "undefined") {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const nodeCrypto = require("crypto");
+      if (nodeCrypto && nodeCrypto.webcrypto) {
+        return nodeCrypto.webcrypto;
+      }
+    } catch {}
+  }
+  return globalThis.crypto;
+};
+
+const webCrypto = getCrypto();
+
 // GF(2^8) implementation with Rijndael polynomial 0x11B
 const expTable = new Uint8Array(256);
 const logTable = new Uint8Array(256);
@@ -11,10 +33,11 @@ let x = 1;
 for (let i = 0; i < 255; i++) {
   expTable[i] = x;
   logTable[x] = i;
-  x <<= 1;
-  if (x & 0x100) {
-    x ^= 0x11b;
+  let nextX = x << 1;
+  if (nextX & 0x100) {
+    nextX ^= 0x11b;
   }
+  x = nextX ^ x;
 }
 expTable[255] = expTable[0];
 
@@ -45,7 +68,7 @@ export interface EncryptedShare {
  */
 export function splitSecret(secret: Uint8Array): [Share, Share, Share] {
   const a1 = new Uint8Array(secret.length);
-  crypto.getRandomValues(a1);
+  webCrypto.getRandomValues(a1);
 
   const shares: [Share, Share, Share] = [
     { x: 1, y: new Uint8Array(secret.length) },
@@ -119,8 +142,8 @@ export async function encryptShare(
   share: Share,
   key: CryptoKey,
 ): Promise<EncryptedShare> {
-  const iv = crypto.getRandomValues(new Uint8Array(12));
-  const ciphertext = await crypto.subtle.encrypt(
+  const iv = webCrypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await webCrypto.subtle.encrypt(
     { name: "AES-GCM", iv },
     key,
     share.y as any,
@@ -143,10 +166,10 @@ export async function decryptShare(
   const iv = base64ToBuffer(encrypted.iv);
   const ciphertext = base64ToBuffer(encrypted.ciphertext);
 
-  const plaintext = await crypto.subtle.decrypt(
+  const plaintext = await webCrypto.subtle.decrypt(
     { name: "AES-GCM", iv: new Uint8Array(iv) },
     key,
-    ciphertext,
+    new Uint8Array(ciphertext),
   );
 
   return {

@@ -77,7 +77,7 @@ export function computeCityMetrics(
   const avgWifiSpeed =
     wifiSpeeds.length > 0
       ? Math.round(wifiSpeeds.reduce((a, b) => a + b, 0) / wifiSpeeds.length)
-      : null;
+      : 0;
 
   const outletCount = cityVenues.filter((v) => v.hasOutlets).length;
   const quietCount = cityVenues.filter((v) => v.noiseLevel === "quiet").length;

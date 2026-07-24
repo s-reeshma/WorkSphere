@@ -31,7 +31,7 @@ jest.mock("@/lib/pdfGenerator", () => ({
 }));
 
 describe("Guest List PDF Export (GET /api/bookings/[bookingId]/guests?format=pdf)", () => {
-  const mockAuth = auth as jest.Mock;
+  const mockAuth = auth as unknown as jest.Mock;
   const mockFindUnique = (prisma as any).booking.findUnique as jest.Mock;
   const mockGetBookingGuests = getBookingGuests as jest.Mock;
   const mockGeneratePdf = generateGuestListPdf as jest.Mock;

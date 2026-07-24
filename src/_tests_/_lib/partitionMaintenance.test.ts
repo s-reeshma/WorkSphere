@@ -1,7 +1,7 @@
 import { checkPartitionHealth } from "../../lib/partitionMaintenance";
 import { prisma } from "../../lib/prisma";
 
-jest.mock("../prisma", () => ({
+jest.mock("../../lib/prisma", () => ({
   prisma: {
     $queryRawUnsafe: jest.fn(),
   },
@@ -14,7 +14,7 @@ describe("checkPartitionHealth()", () => {
 
   it("should return HEALTHY when all upcoming partitions exist", async () => {
     (prisma.$queryRawUnsafe as jest.Mock).mockResolvedValue([
-      { relname: "PushNotificationLog_y2026m08", n_live_tup: 100 }
+      { relname: "PushNotificationLog_y2026m08", n_live_tup: 100 },
     ]);
 
     const report = await checkPartitionHealth();

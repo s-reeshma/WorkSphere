@@ -371,7 +371,7 @@ export class CrowdSimulationEngine {
           BufferUsage.STORAGE | BufferUsage.COPY_SRC | BufferUsage.COPY_DST,
       });
 
-      this.device.queue.writeBuffer(this.agentBufferA, 0, this.agents as any);
+      this.device.queue.writeBuffer(this.agentBufferA!, 0, this.agents as any);
 
       this.recreateBindGroups();
 
@@ -708,7 +708,7 @@ export class CrowdSimulationEngine {
     });
 
     const computePipelineLayout = this.device.createPipelineLayout({
-      bindGroupLayouts: [computeBindGroupLayout],
+      bindGroupLayouts: [this.computeBindGroupLayout],
     });
 
     // WebGPU compute pipeline creation
@@ -731,7 +731,7 @@ export class CrowdSimulationEngine {
 
       // Create bind groups (ping-pong)
       this.computeBindGroupA = this.device.createBindGroup({
-        layout: computeBindGroupLayout,
+        layout: this.computeBindGroupLayout,
         entries: [
           { binding: 0, resource: { buffer: this.computeUniformBuffer! } },
           { binding: 1, resource: { buffer: this.agentBufferA! } },
@@ -744,7 +744,7 @@ export class CrowdSimulationEngine {
       });
 
       this.computeBindGroupB = this.device.createBindGroup({
-        layout: computeBindGroupLayout,
+        layout: this.computeBindGroupLayout,
         entries: [
           { binding: 0, resource: { buffer: this.computeUniformBuffer! } },
           { binding: 1, resource: { buffer: this.agentBufferB! } },
