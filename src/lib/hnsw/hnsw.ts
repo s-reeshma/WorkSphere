@@ -130,7 +130,10 @@ export class HNSWIndex {
     }
 
     let currEntry = this.entryPoint;
-    let currDist = this.cosineDistance(vector, this.nodes.get(currEntry)!.vector);
+    const _currDist = this.cosineDistance(
+      vector,
+      this.nodes.get(currEntry)!.vector,
+    );
 
     for (let l = this.maxLevel; l > level; l--) {
       const changed = true;
@@ -149,10 +152,7 @@ export class HNSWIndex {
         l,
       );
 
-      const neighbors = this.selectNeighborsSimple(
-        layerResults,
-        this.config.M,
-      );
+      const neighbors = this.selectNeighborsSimple(layerResults, this.config.M);
 
       const neighborIds = neighbors.map((n) => n.id);
       node.neighbors.set(l, neighborIds);
@@ -172,7 +172,10 @@ export class HNSWIndex {
               return n
                 ? {
                     id: nid,
-                    distance: this.cosineDistance(n.vector, neighborNode.vector),
+                    distance: this.cosineDistance(
+                      n.vector,
+                      neighborNode.vector,
+                    ),
                   }
                 : null;
             })

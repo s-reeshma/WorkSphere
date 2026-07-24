@@ -53,13 +53,30 @@ export function CustomAvatarUpload() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const objectUrls = useRef<Set<string>>(new Set());
+
+  const createSafeObjectURL = (file: File | Blob) => {
+    const url = URL.createObjectURL(file);
+    objectUrls.current.add(url);
+    return url;
+  };
+
+  const revokeSafeObjectURL = (url: string) => {
+    if (objectUrls.current.has(url)) {
+      URL.revokeObjectURL(url);
+      objectUrls.current.delete(url);
+    }
+  };
+
   useEffect(() => {
+    const urlsToRevoke = objectUrls.current;
     return () => {
-      if (cropSource) {
-        URL.revokeObjectURL(cropSource);
-      }
+      urlsToRevoke.forEach((url) => {
+        URL.revokeObjectURL(url);
+      });
+      urlsToRevoke.clear();
     };
-  }, [cropSource]);
+  }, []);
 
   if (!isLoaded || !user) {
     return null;
@@ -78,7 +95,7 @@ export function CustomAvatarUpload() {
 
     setCropSource((currentSource) => {
       if (currentSource) {
-        URL.revokeObjectURL(currentSource);
+        revokeSafeObjectURL(currentSource);
       }
       return null;
     });
@@ -129,11 +146,11 @@ export function CustomAvatarUpload() {
         return;
       }
 
-      const source = URL.createObjectURL(file);
+      const source = createSafeObjectURL(file);
 
       setCropSource((currentSource) => {
         if (currentSource) {
-          URL.revokeObjectURL(currentSource);
+          revokeSafeObjectURL(currentSource);
         }
 
         return source;
@@ -157,8 +174,14 @@ export function CustomAvatarUpload() {
     try {
       if (!user) return;
       const normalizedFile = await normalizeImageOrientation(croppedFile);
-      const objectUrl = URL.createObjectURL(normalizedFile);
-      setPreviewUrl(objectUrl);
+      const objectUrl = createSafeObjectURL(normalizedFile);
+
+      setPreviewUrl((currentPreview) => {
+        if (currentPreview) {
+          revokeSafeObjectURL(currentPreview);
+        }
+        return objectUrl;
+      });
 
       await user.setProfileImage({
         file: normalizedFile,
@@ -170,7 +193,7 @@ export function CustomAvatarUpload() {
 
       setCropSource((currentSource) => {
         if (currentSource) {
-          URL.revokeObjectURL(currentSource);
+          revokeSafeObjectURL(currentSource);
         }
         return null;
       });
